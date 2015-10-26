@@ -75,3 +75,5 @@ for file in anathomy.keys():
         row.clear()
     print "\n"
     del(tree)
+
+cnx.commit()
