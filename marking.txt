@@ -1,0 +1,3 @@
+'How to install wheel package file\thttp://stackoverflow.com/a/27885547'
+'How to sort list of lists by elements index\thttp://stackoverflow.com/a/4174955'
+'How to update Python\thttp://stackoverflow.com/a/17954487'
