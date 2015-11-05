@@ -8,7 +8,7 @@ from mysql.connector import errorcode
 # Configurations
 db_user = 'root'
 db_password = 'password'
-db_name = 'tests'
+db_name = 'stackoverflowdump'
 path_to_xml_dump = 'D:\\stackexchange\\'
 
 
@@ -17,7 +17,7 @@ anathomy = {
  'posts': {
   'Id':'INTEGER', 
   'PostTypeId':'INTEGER', # 1: Question, 2: Answer
-  'ParentID':'INTEGER', # (only present if PostTypeId is 2)
+  'ParentId':'INTEGER', # (only present if PostTypeId is 2)
   'AcceptedAnswerId':'INTEGER', # (only present if PostTypeId is 1)
   'CreationDate':'DATETIME',
   'Score':'INTEGER',
@@ -31,7 +31,7 @@ anathomy = {
  },
 }
 
-create_query='CREATE TABLE {table} ({fields})'
+create_query='CREATE TABLE {table} ({fields}, INDEX Id (Id), INDEX ParentId (ParentId), INDEX PostTypeId (PostTypeId))'
 insert_query='INSERT INTO {table} ({columns}) VALUES ({values})'
 
 
@@ -73,6 +73,7 @@ for file in anathomy.keys():
         print(err)
       finally:
         row.clear()
+        
     print "\n"
     del(tree)
 
