@@ -1,12 +1,20 @@
 import telegram
 import json
 
-TOKEN = StackOverflowYaBot.token
+from elasticsearch import Elasticsearch
+
+TOKEN = '176555048:AAEVy6LfbRk5fcBlyFpY72iR5VxJE5Oo2XU'#StackOverflowYaBot.token
 
 LAST_UPDATE_ID = None
 LAST_MESSAGE = None
 IS_KEYBOARD_WORKING = False
 commands = [['/start'], ['/more'], ['/exit']]
+
+
+def search(bot, query):
+    es = Elasticsearch()
+    res = es.search(index='stackoverflowdump', body={"query": {"match": {"body" : query}}})
+    return res
 
 
 def execute(cmd, bot, chat_id):
@@ -45,9 +53,12 @@ def answer(bot):
             reply_markup = json.dumps(reply_markup)
             if not dec_message.startswith('/'):
                 IS_KEYBOARD_WORKING = True
+
+                answer_text = search(bot, dec_message)['hits']['hits'][0]['_source']['doc']['answer']
                 bot.sendMessage(chat_id=chat_id,
-                                text=dec_message, reply_markup=reply_markup)
-                LAST_MESSAGE = dec_message
+                                text=answer_text, reply_markup=reply_markup)
+                
+                LAST_MESSAGE = answer_text
             else:
                 execute(dec_message, bot, chat_id)
 
