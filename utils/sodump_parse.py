@@ -31,7 +31,7 @@ anathomy = {
  },
 }
 
-create_query='CREATE TABLE {table} ({fields}, INDEX Id (Id), INDEX ParentId (ParentId), INDEX PostTypeId (PostTypeId))'
+create_query='CREATE TABLE {table} ({fields}, PRIMARY KEY ( Id ))'
 insert_query='INSERT INTO {table} ({columns}) VALUES ({values})'
 
 
@@ -39,42 +39,48 @@ insert_query='INSERT INTO {table} ({columns}) VALUES ({values})'
 cnx = mysql.connector.connect(user = db_user, password = db_password, database = db_name)
 cursor = cnx.cursor()
 
-for file in anathomy.keys():
-  print "Opening {0}.xml".format(file)
-  with open(os.path.join(path_to_xml_dump, file + '.xml')) as xml_file:
-    tree = etree.iterparse(xml_file)
-    table_name = file
+try:
+  for file in anathomy.keys():
+    print("Opening {0}.xml".format(file))
+    with open(os.path.join(path_to_xml_dump, file + '.xml')) as xml_file:
+      tree = etree.iterparse(xml_file)
+      table_name = file
 
-    sql_create = create_query.format(
-      table=table_name, 
-      fields=", ".join(['{0} {1}'.format(name, type) for name, type in anathomy[table_name].items()]))
-    print('Creating table {0}'.format(table_name))
-
-    try:
-      cursor.execute(sql_create)
-    except mysql.connector.Error as err:
-      print(err)
-      break
-
-    table_fields = [name for name, type in anathomy[table_name].items()]
-
-    for events, row in tree:
-
-      columns_values = {col:val for col,val in row.attrib.iteritems() if col in table_fields}
-
-      sql_insert = insert_query.format(
-          table = table_name, 
-          columns = ', '.join(columns_values.keys()),
-          values = ('%s, ' * len(columns_values.keys()))[:-2])
+      sql_create = create_query.format(
+        table=table_name, 
+        fields=", ".join(['{0} {1}'.format(name, type) for name, type in anathomy[table_name].items()]))
+      print('Creating table {0}'.format(table_name))
 
       try:
-        cursor.execute(sql_insert, columns_values.values())
+        cursor.execute(sql_create)
       except mysql.connector.Error as err:
         print(err)
-      finally:
-        row.clear()
-        
-    print "\n"
-    del(tree)
+        break
 
-cnx.commit()
+      table_fields = [name for name, type in anathomy[table_name].items()]
+
+      for events, row in tree:
+
+        columns_values = {col:val for col,val in row.attrib.iteritems() if col in table_fields}
+
+        if 'Id' not in columns_values.keys():
+          print('Entry with NULL Id was skipped')
+          continue
+
+        sql_insert = insert_query.format(
+            table = table_name, 
+            columns = ', '.join(columns_values.keys()),
+            values = ('%s, ' * len(columns_values.keys()))[:-2])
+
+        try:
+          cursor.execute(sql_insert, columns_values.values())
+        except mysql.connector.Error as err:
+          print(err)
+        finally:
+          row.clear()
+
+      print("{0} succesfully parsed!".format(file))
+      del(tree)
+
+finally:
+  cnx.commit()
