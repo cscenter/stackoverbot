@@ -3,17 +3,22 @@ import json
 
 from elasticsearch import Elasticsearch
 
-TOKEN = '176555048:AAEVy6LfbRk5fcBlyFpY72iR5VxJE5Oo2XU'#StackOverflowYaBot.token
 
 LAST_UPDATE_ID = None
 LAST_MESSAGE = None
 IS_KEYBOARD_WORKING = False
 commands = [['/start'], ['/more'], ['/exit']]
 
+try:
+    TOKEN = open('StackOverflowYaBot.token').readline()
+except:
+    print("No token file found")
+
+
 
 def search(bot, query):
-    es = Elasticsearch()
-    res = es.search(index='stackoverflowdump', body={"query": {"match": {"body" : query}}})
+    es = Elasticsearch([{'host': 'localhost', 'port': 9200}])
+    res = es.search(index='stackoverflowdump2', body={"query": {"match": {"Body" : query}}})
     return res
 
 
@@ -54,7 +59,17 @@ def answer(bot):
             if not dec_message.startswith('/'):
                 IS_KEYBOARD_WORKING = True
 
-                answer_text = search(bot, dec_message)['hits']['hits'][0]['_source']['doc']['answer']
+                search_results = search(bot, dec_message)
+
+                if search_results['hits']['total'] > 0:
+                    answer_text = 'http://stackoverflow.com/questions/' + str(search_results['hits']['hits'][0]['_source']['doc']['question']['Id'])
+                    answer_text += '\n' * 2
+                    answer_text += search_results['hits']['hits'][0]['_source']['doc']['question']['Body']
+                    answer_text += '\n' * 2
+                    answer_text += search_results['hits']['hits'][0]['_source']['doc']['answer']['Body']
+                else:
+                    answer_text = 'I know nothing, sorry'
+
                 bot.sendMessage(chat_id=chat_id,
                                 text=answer_text, reply_markup=reply_markup)
                 
