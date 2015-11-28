@@ -1,8 +1,20 @@
 import telegram
 import json
 
+from HTMLParser import HTMLParser
+from BeautifulSoup import BeautifulSoup
 from elasticsearch import Elasticsearch
 
+
+bot_answer_template = '''
+http://stackoverflow.com/questions/{question_id}
+---------
+*{question_title}*
+
+{question_body}
+---------
+{answer_body}
+'''
 
 LAST_UPDATE_ID = None
 LAST_MESSAGE = None
@@ -15,10 +27,32 @@ except:
     print("No token file found")
 
 
+def prepare_for_markdown(string):
+    soup = BeautifulSoup(string)
+    for tag in soup.findAll():
+        if tag.name == 'code':
+            if tag.string is not None:
+                tag.string = '```' + tag.string + '```'
+        elif tag.name == 'a':
+            if tag['href'] is not None:
+                tag.replaceWith(tag['href'])
+        elif tag.name == 'strong':
+            if tag.string is not None:
+                tag.string = '*' + tag.string + '*'
+        else:
+            if (tag.string is not None):
+                tag.string = tag.string.replace('*', '\*')
+
+    htmlParser = HTMLParser()
+    plain_text = htmlParser.unescape(soup.getText('\n'))
+    plain_text = plain_text.replace('\n\n', '\n')
+    return plain_text
+
 
 def search(bot, query):
     es = Elasticsearch([{'host': 'localhost', 'port': 9200}])
-    res = es.search(index='stackoverflowdump2', body={"query": {"match": {"Body" : query}}})
+    search_hits = es.search(index='stackoverflowdump2', body={"query": {"match": {"Body" : query}}})
+    res = [hit['_source']['doc'] for hit in search_hits['hits']['hits']]
     return res
 
 
@@ -61,19 +95,24 @@ def answer(bot):
 
                 search_results = search(bot, dec_message)
 
-                if search_results['hits']['total'] > 0:
-                    answer_text = 'http://stackoverflow.com/questions/' + str(search_results['hits']['hits'][0]['_source']['doc']['question']['Id'])
-                    answer_text += '\n' * 2
-                    answer_text += search_results['hits']['hits'][0]['_source']['doc']['question']['Body']
-                    answer_text += '\n' * 2
-                    answer_text += search_results['hits']['hits'][0]['_source']['doc']['answer']['Body']
+                if (len(search_results) > 0):
+                    answer_text = bot_answer_template.format(
+                        question_id=search_results[0]['question']['Id'],
+                        question_title=search_results[0]['question']['Title'],
+                        question_body=prepare_for_markdown(search_results[0]['question']['Body']),
+                        answer_body=prepare_for_markdown(
+                            search_results[0]['answer']['Body']
+                        )
+                    )
                 else:
                     answer_text = 'I know nothing, sorry'
 
                 bot.sendMessage(chat_id=chat_id,
-                                text=answer_text, reply_markup=reply_markup)
-                
+                                text=answer_text,
+                                reply_markup=reply_markup,
+                                parse_mode=telegram.ParseMode.MARKDOWN)
                 LAST_MESSAGE = answer_text
+
             else:
                 execute(dec_message, bot, chat_id)
 
