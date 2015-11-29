@@ -20,6 +20,7 @@ LAST_UPDATE_ID = None
 LAST_MESSAGE = None
 IS_KEYBOARD_WORKING = False
 commands = [['/start'], ['/more'], ['/exit']]
+sessions = {}
 
 try:
     TOKEN = open('StackOverflowYaBot.token').readline()
@@ -39,14 +40,28 @@ def prepare_for_markdown(string):
         elif tag.name == 'strong':
             if tag.string is not None:
                 tag.string = '*' + tag.string + '*'
-        else:
-            if (tag.string is not None):
-                tag.string = tag.string.replace('*', '\*')
 
     htmlParser = HTMLParser()
-    plain_text = htmlParser.unescape(soup.getText('\n'))
+    soup_text  = soup.getText('\n')
+    soup_text = soup_text.replace('*', '\*')
+    soup_text = soup_text.replace('_', '\_')
+    plain_text = htmlParser.unescape(soup_text)
     plain_text = plain_text.replace('\n\n', '\n')
     return plain_text
+
+
+def prepare_answer_from_search_output(search_results, result_id):
+    answer_text = bot_answer_template.format(
+        question_id=search_results[result_id]['question']['Id'],
+        question_title=search_results[result_id]['question']['Title'],
+        question_body=prepare_for_markdown(
+            search_results[result_id]['question']['Body']
+        ),
+        answer_body=prepare_for_markdown(
+            search_results[result_id]['answer']['Body']
+        )
+    )
+    return answer_text
 
 
 def search(bot, query):
@@ -57,15 +72,34 @@ def search(bot, query):
 
 
 def execute(cmd, bot, chat_id):
-    global LAST_MESSAGE, IS_KEYBOARD_WORKING
+    global LAST_MESSAGE, IS_KEYBOARD_WORKING, sessions
 
     if cmd.startswith('/start'):
         bot.sendMessage(chat_id=chat_id,
                         text='Welcome to Stack Overflow search bot!')
 
     elif cmd.startswith('/more'):
-        bot.sendMessage(chat_id=chat_id,
-                        text=LAST_MESSAGE)
+        if chat_id in sessions.keys():
+            if sessions[chat_id]['current_answer'] < (len(sessions[chat_id]['search_results']) - 1):
+                sessions[chat_id]['current_answer'] += 1
+                bot.sendMessage(
+                    chat_id=chat_id,
+                    parse_mode=telegram.ParseMode.MARKDOWN,
+                    text=prepare_answer_from_search_output(
+                        sessions[chat_id]['search_results'],
+                        sessions[chat_id]['current_answer']
+                    )
+                )
+            else:
+                bot.sendMessage(
+                    chat_id=chat_id,
+                    text="Sorry, I'm out of good guesses - try different one!"
+                )
+        else:
+            bot.sendMessage(
+                chat_id=chat_id,
+                text="Hey, ask me something first!"
+            )
 
     elif cmd.startswith('/exit'):
         if IS_KEYBOARD_WORKING:
@@ -81,29 +115,28 @@ def execute(cmd, bot, chat_id):
 
 def answer(bot):
     global LAST_UPDATE_ID, LAST_MESSAGE, IS_KEYBOARD_WORKING
+
     for update in bot.getUpdates(offset=LAST_UPDATE_ID):
         chat_id = update.message.chat_id
         message = update.message.text.encode('utf-8')
         dec_message = message.decode('utf-8')
 
         if message:
-            reply_markup = {'keyboard': commands[1::],
-                            'resize_keyboard': True, 'one_time_keyboard': False}
+            reply_markup = {
+                'keyboard': commands[1::],
+                'resize_keyboard': True,
+                'one_time_keyboard': False
+            }
             reply_markup = json.dumps(reply_markup)
+
             if not dec_message.startswith('/'):
                 IS_KEYBOARD_WORKING = True
 
                 search_results = search(bot, dec_message)
 
                 if (len(search_results) > 0):
-                    answer_text = bot_answer_template.format(
-                        question_id=search_results[0]['question']['Id'],
-                        question_title=search_results[0]['question']['Title'],
-                        question_body=prepare_for_markdown(search_results[0]['question']['Body']),
-                        answer_body=prepare_for_markdown(
-                            search_results[0]['answer']['Body']
-                        )
-                    )
+                    answer_text = prepare_answer_from_search_output(search_results, 0)
+                    sessions[chat_id] = {'current_answer': 0, 'search_results' : search_results}
                 else:
                     answer_text = 'I know nothing, sorry'
 
@@ -111,7 +144,6 @@ def answer(bot):
                                 text=answer_text,
                                 reply_markup=reply_markup,
                                 parse_mode=telegram.ParseMode.MARKDOWN)
-                LAST_MESSAGE = answer_text
 
             else:
                 execute(dec_message, bot, chat_id)
@@ -121,6 +153,7 @@ def answer(bot):
 
 def main():
     global LAST_UPDATE_ID
+
     bot = telegram.Bot(TOKEN)
     try:
         LAST_UPDATE_ID = bot.getUpdates()[-1].update_id
