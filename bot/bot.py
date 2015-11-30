@@ -19,13 +19,28 @@ http://stackoverflow.com/questions/{question_id}
 LAST_UPDATE_ID = None
 LAST_MESSAGE = None
 IS_KEYBOARD_WORKING = False
-commands = [['/start'], ['/more'], ['/exit']]
+commands = [['/start'], ['/ok'], ['/more'], ['/exit']]
 sessions = {}
 
 try:
     TOKEN = open('StackOverflowYaBot.token').readline()
 except:
     print("No token file found")
+
+
+def prepare_for_logging(string):
+    string = string.replace('\n', ' ')
+    string = string.replace('\t', ' ')
+    return string
+
+def log_results(session, correctness):
+    question = prepare_for_logging(session['question'])
+    answer_id = session['search_results'][session['current_answer']]['answer']['Id']
+    answer = prepare_for_logging(
+        session['search_results'][session['current_answer']]['answer']['Body']
+    )
+    with open('results.log', 'a') as log:
+        log.write('{0}\t{1}\t{2}\t{3}\n'.format(question, answer_id, answer, correctness))
 
 
 def prepare_for_markdown(string):
@@ -78,8 +93,24 @@ def execute(cmd, bot, chat_id):
         bot.sendMessage(chat_id=chat_id,
                         text='Welcome to Stack Overflow search bot!')
 
+    elif cmd.startswith('/ok'):
+        if chat_id in sessions.keys():
+            log_results(sessions[chat_id], True)
+            bot.sendMessage(
+                chat_id=chat_id,
+                parse_mode=telegram.ParseMode.MARKDOWN,
+                text="I'm glad to help you!"
+            )
+        else:
+            bot.sendMessage(
+                chat_id=chat_id,
+                parse_mode=telegram.ParseMode.MARKDOWN,
+                text="You don't need much for happiness, do you?"
+            )
+
     elif cmd.startswith('/more'):
         if chat_id in sessions.keys():
+            log_results(sessions[chat_id], False)
             if sessions[chat_id]['current_answer'] < (len(sessions[chat_id]['search_results']) - 1):
                 sessions[chat_id]['current_answer'] += 1
                 bot.sendMessage(
@@ -136,7 +167,7 @@ def answer(bot):
 
                 if (len(search_results) > 0):
                     answer_text = prepare_answer_from_search_output(search_results, 0)
-                    sessions[chat_id] = {'current_answer': 0, 'search_results' : search_results}
+                    sessions[chat_id] = {'question': dec_message, 'current_answer': 0, 'search_results' : search_results}
                 else:
                     answer_text = 'I know nothing, sorry'
 
