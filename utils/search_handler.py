@@ -16,17 +16,23 @@ def search(query):
     res = [hit['_source']['doc'] for hit in search_hits['hits']['hits']]
     return res
 
+
+def get_best_answer_id(query):
+    search_results = search(query)
+    return search_results[0]['answer']['Id']
+
+
 class MyHandler(http.server.BaseHTTPRequestHandler):
 
     def do_GET(self):
         params = parse_qs(urlparse(self.path).query)
         search_query = params['q'][0]
-        search_results = search(search_query)
+        best_answer_id = get_best_answer_id(search_query)
 
         self.send_response(200)
         self.send_header("Content-type", "text/html")
         self.end_headers()
-        self.wfile.write(bytes(str(search_results[0]['answer']['Id']), 'utf-8'))
+        self.wfile.write(bytes(str(best_answer_id), 'utf-8'))
 
 if __name__ == '__main__':
     server_class = http.server.HTTPServer

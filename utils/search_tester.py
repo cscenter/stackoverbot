@@ -2,6 +2,8 @@ import requests
 import pandas
 import mysql.connector
 
+from search_handler import get_best_answer_id
+
 
 db_config = {
     'user': 'root',
@@ -20,7 +22,7 @@ def get_additional_fields(ids, fields):
     return pandas.DataFrame(cursor.fetchall())
 
 
-def test_from_dataset(dataset):
+def test_from_dataset(dataset, http=False):
     questions_ids = dataset['Id']
     answers_ids = dataset['AcceptedAnswerId']
 
@@ -28,15 +30,21 @@ def test_from_dataset(dataset):
 
     accuracy = 0
     for i in range(len(questions)):
-        try:
-            r = requests.get(url='http://localhost:9000/', params={'q': str(questions['Title'][i])})
-            if (int(r.text) == answers_ids[i]):
-                accuracy += 1
-            if (i + 1) % 10 == 0:
-                print('Tested entries: {0}'.format(i + 1))
-        except requests.exceptions.RequestException as e:
-            print(str(questions['Title'][i]))
-            print(e)
+        guess = None
+        if http:
+            try:
+                r = requests.get(url='http://localhost:9000/', params={'q': str(questions['Title'][i])})
+                guess = int(r.text)
+            except requests.exceptions.RequestException as e:
+                print(str(questions['Title'][i]))
+                print(e)
+        else:
+            guess = get_best_answer_id(str(questions['Title'][i]))
+
+        if guess == answers_ids[i]:
+            accuracy += 1
+        if (i + 1) % 10 == 0:
+            print('Tested entries: {0}'.format(i + 1))
 
     return accuracy / len(questions)
 
