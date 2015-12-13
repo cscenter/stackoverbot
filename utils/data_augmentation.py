@@ -98,5 +98,3 @@ def delete_untagged(phrase, tags):
     for i in range(1, s_len):
         new_queries.append(delete_untagged_nwords(phrase, i, tags))
     return list(itertools.chain.from_iterable(new_queries))
-
-print(add_stop_words('cause i am the last one'))
