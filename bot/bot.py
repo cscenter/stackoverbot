@@ -1,8 +1,9 @@
 import telegram
 import json
+import html
 
-from HTMLParser import HTMLParser
-from BeautifulSoup import BeautifulSoup
+from html.parser import HTMLParser
+from bs4 import BeautifulSoup
 from elasticsearch import Elasticsearch
 
 
@@ -56,11 +57,10 @@ def prepare_for_markdown(string):
             if tag.string is not None:
                 tag.string = '*' + tag.string + '*'
 
-    htmlParser = HTMLParser()
-    soup_text  = soup.getText('\n')
+    soup_text = soup.getText('\n')
     soup_text = soup_text.replace('*', '\*')
     soup_text = soup_text.replace('_', '\_')
-    plain_text = htmlParser.unescape(soup_text)
+    plain_text = html.unescape(soup_text)
     plain_text = plain_text.replace('\n\n', '\n')
     return plain_text
 
