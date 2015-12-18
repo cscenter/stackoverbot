@@ -12,14 +12,15 @@ ELASTICSEARCH_INDEX = 'stackoverflowdump2'
 
 def search(query):
     es = Elasticsearch(**ELASTICSEARCH_SETS)
-    search_hits = es.search(index=ELASTICSEARCH_INDEX, body={"query": {"match": {"Body": query}}})
+    search_hits = es.search(index=ELASTICSEARCH_INDEX, body={"size": 10, "query": {"match": {"Title": query}}})
     res = [hit['_source']['doc'] for hit in search_hits['hits']['hits']]
     return res
 
 
 def get_best_answer_id(query):
     search_results = search(query)
-    return search_results[0]['answer']['Id']
+    ids = [result['answer']['Id'] for result in search_results]
+    return ids
 
 
 class MyHandler(http.server.BaseHTTPRequestHandler):
